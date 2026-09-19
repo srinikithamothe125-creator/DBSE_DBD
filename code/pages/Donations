@@ -1,0 +1,248 @@
+import {
+  useEffect,
+  useState
+} from "react";
+
+import DonationCard from
+  "../components/DonationCard";
+
+function Donations({
+  user,
+  onNavigate
+}) {
+  const [donations, setDonations] =
+    useState([]);
+
+  function loadDonations() {
+    const saved =
+      JSON.parse(
+        localStorage.getItem(
+          "foodconnect_donations"
+        )
+      ) || [];
+
+    const available =
+      saved.filter(
+        (donation) =>
+          donation.status ===
+            "AVAILABLE" &&
+          donation.quality_status ===
+            "SCREENING_PASSED"
+      );
+
+    setDonations(
+      available
+    );
+  }
+
+  useEffect(() => {
+    loadDonations();
+  }, []);
+
+  function requestDonation(
+    donation
+  ) {
+    if (!user) {
+      alert(
+        "Please login as an NGO to request food."
+      );
+
+      onNavigate("login");
+
+      return;
+    }
+
+    if (user.role !== "NGO") {
+      alert(
+        "Only NGO users can request donations."
+      );
+
+      return;
+    }
+
+    const quantity =
+      window.prompt(
+        `Enter quantity to request (available: ${donation.quantity} ${donation.unit})`
+      );
+
+    if (
+      quantity === null ||
+      quantity === ""
+    ) {
+      return;
+    }
+
+    const requestedQuantity =
+      Number(quantity);
+
+    if (
+      requestedQuantity <= 0 ||
+      requestedQuantity >
+        Number(donation.quantity)
+    ) {
+      alert(
+        "Please enter a valid quantity."
+      );
+
+      return;
+    }
+
+    const message =
+      window.prompt(
+        "Enter a message for the donor:"
+      ) || "";
+
+    const requests =
+      JSON.parse(
+        localStorage.getItem(
+          "foodconnect_requests"
+        )
+      ) || [];
+
+    const newRequest = {
+  request_id: Date.now(),
+
+  donation_id: donation.donation_id,
+
+  // NGO details
+  ngo_id: user.user_id,
+  ngo_name: user.name,
+
+  // DONOR DETAILS
+  donor_id: donation.donor_id,
+
+  requested_quantity: requestedQuantity,
+
+  message: message,
+
+  status: "PENDING",
+
+  // Arrival information
+  arrival_message: "",
+  arrival_at: null,
+
+  requested_at:
+    new Date().toISOString(),
+
+  // Delivery information
+  delivered_at: null
+};
+
+    requests.push(
+      newRequest
+    );
+
+    localStorage.setItem(
+      "foodconnect_requests",
+      JSON.stringify(
+        requests
+      )
+    );
+
+    const allDonations =
+      JSON.parse(
+        localStorage.getItem(
+          "foodconnect_donations"
+        )
+      ) || [];
+
+    const updatedDonations =
+      allDonations.map(
+        (item) => {
+
+          if (
+            item.donation_id ===
+            donation.donation_id
+          ) {
+            return {
+              ...item,
+              status:
+                "RESERVED"
+            };
+          }
+
+          return item;
+        }
+      );
+
+    localStorage.setItem(
+      "foodconnect_donations",
+      JSON.stringify(
+        updatedDonations
+      )
+    );
+
+    alert(
+      "Donation request submitted successfully!"
+    );
+
+    loadDonations();
+  }
+
+  return (
+    <section className="donations-page">
+
+      <div className="page-header">
+
+        <p className="hero-label">
+          AVAILABLE FOOD
+        </p>
+
+        <h1>
+          Available Donations
+        </h1>
+
+        <p>
+          Only FoodGuard-screened
+          donations are displayed
+          for NGO requests.
+        </p>
+
+      </div>
+
+      {donations.length === 0 && (
+        <div className="no-donations">
+
+          <h2>
+            No donations available
+          </h2>
+
+          <p>
+            Ask a donor to add
+            screened food.
+          </p>
+
+        </div>
+      )}
+
+      <div className="donation-grid">
+
+        {donations.map(
+          (donation) => (
+
+            <DonationCard
+              key={
+                donation.donation_id
+              }
+              donation={
+                donation
+              }
+              showRequest={
+                user?.role ===
+                "NGO"
+              }
+              onRequest={
+                requestDonation
+              }
+            />
+
+          )
+        )}
+
+      </div>
+
+    </section>
+  );
+}
+
+export default Donations;
